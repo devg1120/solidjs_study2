@@ -2,6 +2,13 @@ import { state, setState, UpdateCellFormulaNoEvaluate, deselectCell } from "../S
 import { MarkMode, TextMode } from "../StateManagement/Types";
 
 export function textModeHandleKeyPress(event: KeyboardEvent, textMode: TextMode) {
+
+    console.log(event.isComposing)
+
+    if (event.isComposing || event.key === 'Process') {
+	    console.log("IME process")
+	    return
+    }
     const selectedCell = state.selectedCells[0]; // Assuming a single cell selection
 
     if (!selectedCell) return; // No cell selected

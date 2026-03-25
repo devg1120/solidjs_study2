@@ -4,6 +4,7 @@ import { markModeHandleKeyPress } from "./MarkModeKeyPressHandler";
 import { textModeHandleKeyPress } from "./TextModeKeyPressHandler";
 
 export function handleKeyPress(event: KeyboardEvent) {
+console.log("Keydown", event);
     if ('textMode' in state.mode) {
         let textMode = (state.mode as TextMode);
         textModeHandleKeyPress(event, textMode);
