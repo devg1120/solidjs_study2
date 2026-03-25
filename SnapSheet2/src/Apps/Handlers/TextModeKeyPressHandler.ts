@@ -79,9 +79,11 @@ export function textModeHandleKeyPress(event: KeyboardEvent, textMode: TextMode)
             const start = Math.min(cursorPosition, cursorSelectionStartPosition);
             const end = Math.max(cursorPosition, cursorSelectionStartPosition);
             newFormula = newFormula.slice(0, start) + event.key + newFormula.slice(end);
+            //newFormula = newFormula.slice(0, start) + '関西' + newFormula.slice(end);
             moveCursor(start + 1);
         } else {
-            newFormula = newFormula.slice(0, cursorPosition) + event.key + newFormula.slice(cursorPosition);
+            //newFormula = newFormula.slice(0, cursorPosition) + event.key + newFormula.slice(cursorPosition);
+            newFormula = newFormula.slice(0, cursorPosition) + '関' + newFormula.slice(cursorPosition);
             moveCursor(cursorPosition + 1);
         }
     } else {
