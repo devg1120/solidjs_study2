@@ -1,0 +1,152 @@
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>Wolf-Table</title>
+    <style>
+.wrapper {
+  width: 320px;
+  height: 200px;
+  overflow: auto;
+  position: relative;
+}
+
+table {
+  table-layout: fixed;
+}
+
+thead,
+tr>th {
+  position: sticky;
+  background: #fff;
+}
+
+thead {
+  top: 0;
+  z-index: 2;
+}
+tr>th {
+  left: 0;
+  z-index: 1;
+}
+thead tr>th:first-child {
+  z-index: 3;
+}
+    </style>
+  </head>
+  <body>
+
+<div class="wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th></th>
+        <th>column 1</th>
+        <th>column 2</th>
+        <th>column 3</th>
+        <th>column 4</th>
+        <th>column 5</th>
+        <th>column 6</th>
+        <th>column 7</th>
+        <!-- ... -->
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>row 1</th>
+        <td>scroll 1</td>
+        <td>scroll 2</td>
+        <td>scroll 3</td>
+        <td>scroll 4</td>
+        <td>scroll 5</td>
+        <td>scroll 6</td>
+        <td>scroll 7</td>
+        <!-- ... -->
+      </tr>
+      <tr>
+        <th>row 2</th>
+        <td>scroll 1</td>
+        <td>scroll 2</td>
+        <td>scroll 3</td>
+        <td>scroll 4</td>
+        <td>scroll 5</td>
+        <td>scroll 6</td>
+        <td>scroll 7</td>
+        <!-- ... -->
+      </tr>
+      <tr>
+        <th>row 3</th>
+        <td>scroll 1</td>
+        <td>scroll 2</td>
+        <td>scroll 3</td>
+        <td>scroll 4</td>
+        <td>scroll 5</td>
+        <td>scroll 6</td>
+        <td>scroll 7</td>
+        <!-- ... -->
+      </tr>
+      <tr>
+        <th>row 4</th>
+        <td>scroll 1</td>
+        <td>scroll 2</td>
+        <td>scroll 3</td>
+        <td>scroll 4</td>
+        <td>scroll 5</td>
+        <td>scroll 6</td>
+        <td>scroll 7</td>
+        <!-- ... -->
+      </tr>
+      <tr>
+        <th>row 5</th>
+        <td>scroll 1</td>
+        <td>scroll 2</td>
+        <td>scroll 3</td>
+        <td>scroll 4</td>
+        <td>scroll 5</td>
+        <td>scroll 6</td>
+        <td>scroll 7</td>
+        <!-- ... -->
+      </tr>
+      <tr>
+        <th>row 6</th>
+        <td>scroll 1</td>
+        <td>scroll 2</td>
+        <td>scroll 3</td>
+        <td>scroll 4</td>
+        <td>scroll 5</td>
+        <td>scroll 6</td>
+        <td>scroll 7</td>
+        <!-- ... -->
+      </tr>
+      <tr>
+        <th>row 7</th>
+        <td>scroll 1</td>
+        <td>scroll 2</td>
+        <td>scroll 3</td>
+        <td>scroll 4</td>
+        <td>scroll 5</td>
+        <td>scroll 6</td>
+        <td>scroll 7</td>
+        <!-- ... -->
+      </tr>
+      <tr>
+        <th>row 8</th>
+        <td>scroll 1</td>
+        <td>scroll 2</td>
+        <td>scroll 3</td>
+        <td>scroll 4</td>
+        <td>scroll 5</td>
+        <td>scroll 6</td>
+        <td>scroll 7</td>
+        <!-- ... -->
+      </tr>
+      <!-- ... -->
+    </tbody>
+  </table>
+</div>
+  </body>
+</html>
+
+

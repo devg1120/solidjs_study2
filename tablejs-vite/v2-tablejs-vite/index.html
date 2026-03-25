@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>custum table</title>
+<style>
+#textarea {
+  width:  1400px; 
+  height: 600px;
+}
+</style>
+
+</head>
+<body>
+  <script type="module" >
+	  import {Table} from "./src/table_esm.js";
+	  window.onload = function () {
+   let json_data = `
+        [
+           {"index":{"id":"int","first_name":"string","last_name":"string","age":"int"},
+            "title":{"id":"Id","first_name":"First Name","last_name":"Last Name","age":"Age"},
+            "pk":345
+            },
+           {"fields":{"id":1,"first_name":"Gowri","last_name":"Prasanth","age":24},
+            "model":"hug.tree",
+            "pk":345
+            },
+           {"fields":{"id":2,"first_name":"Saravana","last_name":"vel","age":31},
+            "model":"hug.tree",
+            "pk":484
+            },
+           {"fields":{"id":3,"first_name":"Kumar","last_name":"KG","age":64},
+            "model":"hug.tree",
+            "pk":484
+            }
+         ]
+   `;
+
+
+   let json_data2 = `
+        [
+           {"index":{"id":"int","first_name":"string","last_name":"string"},
+            "title":{"id":"Id","first_name":"First Name","last_name":"Last Name"},
+            "pk":345
+            },
+           {"fields":{"id":1,"first_name":"Gowri","last_name":"Prasanth"},
+            "model":"hug.tree",
+            "pk":345
+            },
+           {"fields":{"id":2,"first_name":"Saravana","last_name":"vel"},
+            "model":"hug.tree",
+            "pk":484
+            },
+           {"fields":{"id":3,"first_name":"Kumar","last_name":"KG"},
+            "model":"hug.tree",
+            "pk":484
+            },
+           {"fields":{"id":4,"first_name":"Syo","last_name":"Gusa"},
+            "model":"hug.tree",
+            "pk":484
+            }
+         ]
+   `;
+   let json_data3 = `
+        [
+           {"index":{"A":"int","B":"int","C":"int","D":"int","E":"int"},
+            "title":{"A":"A","B":"B","C":"C","D":"D","E":"E"}
+            },
+           {"fields":{"A":1,"B":2,"C":3,"D":4,"E":5}
+            },
+           {"fields":{"A":11,"B":12,"C":13,"D":14,"E":15}
+            },
+           {"fields":{"A":21,"B":22,"C":23,"D":24,"E":25}
+            },
+           {"fields":{"A":31,"B":32,"C":33,"D":34,"E":35}
+            }
+         ]
+   `;
+	  let table1 = new Table("container1" );
+	  table1.init(json_data);
+	  let table2 = new Table("container2");
+	  table2.init(json_data2);
+	  let table3 = new Table("container3");
+	  table3.init(json_data3);
+
+	  //let table3 = new Table("container3");
+	  //table3.init();
+	  //let table4 = new Table("container4");
+	  //table4.init();
+	  };
+               
+  </script>
+
+<div class="gp-header">Table Resize in Javascript</div>
+<div class="container" id="container1"></div>
+<br/>
+<div class="gp-header">2nd Table Resize in Javascript</div>
+<div class="container" id="container2"></div>
+<br/>
+<div class="gp-header">2nd Table Resize in Javascript</div>
+<div class="container" id="container3"></div>
+<br/>
+<textarea  id="textarea"></textarea>
+
+</body>
+</html>
