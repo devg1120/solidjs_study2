@@ -1,0 +1,967 @@
+import { mergeRefs } from '@solid-primitives/refs'
+import {
+  type Accessor,
+  children,
+  type ComponentProps,
+  createEffect,
+  createMemo,
+  createSignal,
+  type JSX,
+  mergeProps,
+  on,
+  splitProps,
+} from 'solid-js'
+import { Dynamic } from 'solid-js/web'
+export * from './utils'
+
+const DEBUG = import.meta.env['DEV'] && new URLSearchParams(window.location.search).get('debug')
+const IS_MAC = navigator.platform.startsWith('Mac')
+
+interface RangeOffsets {
+  start: number
+  end: number
+}
+
+interface SelectionOffsets {
+  start: number
+  end: number
+  anchor: number
+  focus: number
+}
+
+export type PatchKind =
+  | 'insertLineBreak'
+  | 'insertFromPaste'
+  | 'insertParagraph'
+  | 'insertReplacementText'
+  | 'insertText'
+  | 'insertCompositionText'
+  | 'deleteByCut'
+  | 'deleteContentForward'
+  | 'deleteContentBackward'
+  | 'deleteWordBackward'
+  | 'deleteWordForward'
+  | 'deleteSoftLineBackward'
+  | 'deleteSoftLineForward'
+  | 'caret'
+
+export interface Patch<T = never> {
+  // see https://w3c.github.io/input-events/#interface-InputEvent-Attributes
+  kind: PatchKind | T
+  data?: string
+  range: RangeOffsets
+  selection: SelectionOffsets
+  undo: string
+}
+
+type DOMEvent<
+  TEvent,
+  TCurrentTarget extends HTMLElement = HTMLElement,
+  TTarget extends Element = Element,
+> = TEvent & { currentTarget: TCurrentTarget; target: TTarget }
+
+interface History<T extends string = never> {
+  future: {
+    array: Patch<T>[]
+    clear(): void
+    pop(): Patch<T> | undefined
+    peek(): Patch<T> | undefined
+    push(patch: Patch<T>): void
+  }
+  past: {
+    array: Patch<T>[]
+    pop(): Patch<T> | undefined
+    peek(): Patch<T> | undefined
+    push(patch: Patch<T>): void
+  }
+}
+
+type HistoryHandler<T extends string> = (history: History<T>) => Array<Patch<T>>
+
+/**********************************************************************************/
+/*                                                                                */
+/*                                    Misc Utils                                  */
+/*                                                                                */
+/**********************************************************************************/
+
+const isInsertEventType = (
+  eventType: string,
+): eventType is 'insertCompositionText' | 'insertText' => eventType.startsWith('insert')
+
+const SINGLE_LINE_EVENT_TYPES = ['insertLineBreak', 'insertParagraph'] as const
+
+type SingleLineEventType = (typeof SINGLE_LINE_EVENT_TYPES)[number]
+
+const isSingleLineEventType = (eventType: string): eventType is SingleLineEventType =>
+  SINGLE_LINE_EVENT_TYPES.includes(eventType as any)
+
+// TODO: replace with createSignal when solid 2.0
+function createWritable<T>(fn: () => T) {
+  const signal = createMemo(() => createSignal(fn()))
+  const get = () => signal()[0]()
+  const set = (v: any) => signal()[1](v)
+  return [get, set] as ReturnType<typeof createSignal<T>>
+}
+
+function getDataFromBeforeInputEvent(
+  event: DOMEvent<InputEvent>,
+  singleline: boolean,
+): string | undefined {
+  switch (event.inputType) {
+    case 'insertLineBreak':
+    case 'insertParagraph': {
+      return '\n'
+    }
+
+    case 'insertReplacementText':
+    case 'insertFromPaste': {
+      const data = event.dataTransfer?.getData('text')
+
+      if (singleline && data) {
+        return data.replaceAll('\n', ' ')
+      }
+
+      return data ?? undefined
+    }
+
+    case 'insertText':
+    case 'insertCompositionText': {
+      return event.data ?? undefined
+    }
+
+    case 'deleteContentBackward':
+    case 'deleteContentForward':
+    case 'deleteWordBackward':
+    case 'deleteWordForward':
+    case 'deleteSoftLineBackward':
+    case 'deleteSoftLineForward':
+    case 'deleteByCut': {
+    //case 'insertCompositionText': {
+      return undefined
+    }
+
+    default:
+      throw `Unsupported inputType: ${event.inputType}`
+  }
+}
+
+/**********************************************************************************/
+/*                                                                                */
+/*                                TreeWalker Utils                                */
+/*                                                                                */
+/**********************************************************************************/
+
+function* iterateTextNodes(element: HTMLElement): Generator<Text, void, unknown> {
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null)
+  let textNode = walker.nextNode()
+  while (textNode) {
+    yield textNode as Text
+    textNode = walker.nextNode()
+  }
+}
+
+function getTextOffset(element: HTMLElement, targetNode: Node, targetOffset: number): number {
+  // Use TreeWalker to efficiently traverse text nodes
+  let offset = 0
+
+  for (const textNode of iterateTextNodes(element)) {
+    if (textNode === targetNode) {
+      return offset + targetOffset
+    }
+    offset += textNode.textContent?.length || 0
+  }
+
+  // If target node not found, return the offset anyway (shouldn't happen in practice)
+  return offset + targetOffset
+}
+
+function getNodeAndOffsetAtIndex(element: HTMLElement, index: number) {
+  // Traverse all text nodes in order
+  let currentOffset = 0
+
+  for (const textNode of iterateTextNodes(element)) {
+    const textLength = textNode.textContent?.length || 0
+
+    if (currentOffset + textLength >= index) {
+      const nodeOffset = index - currentOffset
+      return {
+        node: textNode,
+        offset: nodeOffset,
+      }
+    }
+    currentOffset += textLength
+  }
+
+  // If no text node found and index is 0, we need to handle empty containers
+  if (index === 0) {
+    // Find the deepest element that could contain text
+    let deepest: Element | ChildNode = element
+    while (deepest.firstChild && deepest.firstChild.nodeType === Node.ELEMENT_NODE) {
+      deepest = deepest.firstChild
+    }
+
+    // Create an empty text node if needed
+    if (deepest.childNodes.length === 0) {
+      const emptyText = document.createTextNode('')
+      deepest.appendChild(emptyText)
+      return { node: emptyText, offset: 0 }
+    }
+
+    return { node: deepest, offset: 0 }
+  }
+
+  throw new Error(`Could not find text node at index ${index}`)
+}
+
+/**********************************************************************************/
+/*                                                                                */
+/*                                 Selection Utils                                */
+/*                                                                                */
+/**********************************************************************************/
+
+function getSelectionOffsets(element: HTMLElement): SelectionOffsets {
+  const selection = document.getSelection()
+
+  if (!selection || selection.rangeCount === 0) {
+    DEBUG && console.info('getSelectionOffsets - ❌ No selection found')
+    return { start: 0, end: 0, anchor: 0, focus: 0 }
+  }
+
+  // Use the improved text offset calculation
+  const anchor = getTextOffset(element, selection.anchorNode!, selection.anchorOffset)
+  const focus = getTextOffset(element, selection.focusNode!, selection.focusOffset)
+
+  // Firefox fix: clamp selection offsets to actual text length
+  const textLength = element.textContent?.length || 0
+  let clampedAnchor = Math.min(anchor, textLength)
+  let clampedFocus = Math.min(focus, textLength)
+
+  // Firefox-specific fix: detect when Ctrl+A causes incorrect offset calculation
+  // If both offsets are at the end of text but the raw offsets suggest a different selection,
+  // and if the element appears to be fully selected, treat it as select-all
+  if (clampedAnchor === textLength && clampedFocus === textLength && textLength > 0) {
+    const range = selection.getRangeAt(0)
+    if (
+      range.startContainer === range.endContainer &&
+      range.startOffset === 0 &&
+      (range.endOffset === 1 || range.toString().length === textLength)
+    ) {
+      // This is likely a select-all that Firefox reported incorrectly
+      clampedAnchor = 0
+      clampedFocus = textLength
+    }
+  }
+
+  const result = {
+    start: Math.min(clampedAnchor, clampedFocus),
+    end: Math.max(clampedAnchor, clampedFocus),
+    anchor: clampedAnchor,
+    focus: clampedFocus,
+  }
+
+  DEBUG &&
+    console.info(
+      'getSelectionOffsets - 📍 Selection calculated',
+      JSON.stringify({
+        result,
+        selectionRangeCount: selection.rangeCount,
+        anchorOffset: selection.anchorOffset,
+        focusOffset: selection.focusOffset,
+        elementTextContent: element.textContent,
+      }),
+    )
+
+  return result
+}
+
+function select(element: HTMLElement, { anchor, focus }: { anchor: number; focus?: number }) {
+  const selection = document.getSelection()!
+  const range = document.createRange()
+
+  const resultAnchor = getNodeAndOffsetAtIndex(element, anchor)
+
+  // Special handling for newline characters when using nested divs
+  //
+  // When content is wrapped in nested containers like:
+  // <div class="ec-line"><div class="code"><span>text\n</span></div></div>
+  // <div class="ec-line"><div class="code"><span>next line</span></div></div>
+  //
+  // The browser places the caret at the end of the newline character, but this
+  // keeps it visually on the same line. We need to move it to the beginning
+  // of the next line's content for proper visual feedback.
+  if (resultAnchor.node.nodeType === Node.TEXT_NODE) {
+    const content = resultAnchor.node.textContent || ''
+    const isAtEndOfNewline =
+      // Case 1: Pure newline in its own span - e.g., <span>\n</span>
+      // Position after 'sum' and press space creates: <span>sum</span><span>\n</span>
+      (content === '\n' && resultAnchor.offset === 1) ||
+      // Case 2: Trailing whitespace + newline - e.g., <span>sum} \n</span>
+      // Position after 'sum} ' and press space creates: <span>sum} \n</span>
+      (content.endsWith('\n') && resultAnchor.offset === content.length)
+
+    if (isAtEndOfNewline) {
+      // Find the next text node after the current one and move caret there
+      // This makes the caret appear at the beginning of the next line visually
+      let foundCurrent = false
+      for (const textNode of iterateTextNodes(element)) {
+        if (foundCurrent) {
+          resultAnchor.node = textNode
+          resultAnchor.offset = 0
+          break
+        }
+        if (textNode === resultAnchor.node) {
+          foundCurrent = true
+        }
+      }
+    }
+  }
+
+  range.setStart(resultAnchor.node, resultAnchor.offset)
+  range.setEnd(resultAnchor.node, resultAnchor.offset)
+
+  selection.empty()
+  selection.addRange(range)
+
+  if (focus !== undefined) {
+    const resultFocus = getNodeAndOffsetAtIndex(element, focus)
+    selection.extend(resultFocus.node, resultFocus.offset)
+  }
+}
+
+/**********************************************************************************/
+/*                                                                                */
+/*                                 Key Combo Utils                                */
+/*                                                                                */
+/**********************************************************************************/
+
+// Follow key-combination-order as described https://superuser.com/a/1238062
+const modifiers = ['Ctrl', 'Alt', 'Shift', 'Meta']
+function getKeyComboFromKeyboardEvent(event: KeyboardEvent) {
+  if (modifiers.includes(event.key)) return event.code
+  const ctrl = event.ctrlKey ? 'Ctrl+' : ''
+  const alt = event.altKey ? 'Alt+' : ''
+  const shift = event.shiftKey ? 'Shift+' : ''
+  const meta = event.metaKey ? 'Meta+' : ''
+  const keyCombo = ctrl + alt + shift + meta + event.code.replace('Key', '')
+
+  DEBUG &&
+    console.info('getKeyComboFromKeyboardEvent - 🎹 Processing keyboard event', event, keyCombo)
+}
+
+const reversedModifiers = modifiers.toReversed()
+function normalizeKeyCombo(keyCombo: string) {
+  return keyCombo
+    .split('+')
+    .sort((a, b) => reversedModifiers.indexOf(b) - reversedModifiers.indexOf(a))
+    .join('+')
+}
+
+/**********************************************************************************/
+/*                                                                                */
+/*                                  History Utils                                 */
+/*                                                                                */
+/**********************************************************************************/
+
+function createHistory<T extends string = never>() {
+  let past: Array<Patch<T>> = []
+  let future: Array<Patch<T>> = []
+
+  return {
+    future: {
+      array: future,
+      clear() {
+        future.length = 0
+      },
+      pop() {
+        const patch = future.pop()
+        DEBUG &&
+          console.info('future.pop - 📤 Popping patch from future', {
+            patch,
+            future,
+            past,
+          })
+        return patch
+      },
+      peek() {
+        const patch = future[future.length - 1]
+        DEBUG &&
+          console.info('future.peek - 👀 Peeking at future patch', {
+            patch,
+            future,
+            past,
+          })
+        return patch
+      },
+      push(patch: Patch<T>) {
+        DEBUG &&
+          console.info('future.push - 📥 Pushing patch to future', {
+            patch,
+            future,
+            past,
+          })
+        future.push(patch)
+      },
+    },
+    past: {
+      array: past,
+      pop() {
+        const patch = past.pop()
+        DEBUG &&
+          console.info('past.pop - 📤 Popping patch from past', {
+            patch,
+            future,
+            past,
+          })
+        if (patch) {
+          future.push(patch)
+        }
+        return patch
+      },
+      peek() {
+        const patch = past[past.length - 1]
+        DEBUG &&
+          console.info('past.peek - 👀 Peeking at past patch', {
+            patch,
+            future,
+            past,
+          })
+        return patch
+      },
+      push(patch: Patch<T>) {
+        DEBUG &&
+          console.info('past.push - 📥 Pushing patch to past', {
+            patch,
+            future,
+            past,
+          })
+        past.push(patch)
+      },
+    },
+  }
+}
+
+function defaultUndo<T extends string = never>(history: History<T>): Array<Patch<T>> {
+  const patches: Array<Patch<T>> = []
+
+  DEBUG && console.log('defaultUndo - 🔄 called, past length:', history.past.array.length)
+
+  let patch: Patch<T> | undefined
+  while ((patch = history.past.pop())) {
+    DEBUG && console.info('defaultUndo - 📤 Popped patch from past', patch.kind, patch.data)
+    patches.push(patch)
+
+    // Skip caret movements
+    if (patch.kind === 'caret') {
+      continue
+    }
+
+    // Check if we should continue grouping
+    const nextPatch = history.past.peek()
+    if (!nextPatch) {
+      break
+    }
+
+    DEBUG && console.info('defaultUndo - 🔍 Next patch', nextPatch.kind, nextPatch.data)
+
+    if (
+      patch.kind !== nextPatch.kind &&
+      !(isInsertEventType(patch.kind) && isInsertEventType(nextPatch.kind))
+    ) {
+      DEBUG && console.info('defaultUndo - group patches: ', patch, nextPatch)
+      break
+    }
+  }
+
+  DEBUG &&
+    console.info(
+      'defaultUndo - ✅ Returning patches',
+      patches.length,
+      'future length now:',
+      history.future.array.length,
+    )
+
+  return patches
+}
+
+function defaultRedo<T extends string = never>(history: History<T>): Array<Patch<T>> {
+  const patches: Array<Patch<T>> = []
+
+  DEBUG && console.info('defaultRedo - 🔄 Called with future length', history.future.array.length)
+
+  let patch: Patch<T> | undefined
+
+  while ((patch = history.future.pop())) {
+    DEBUG && console.log('defaultRedo - 📤 Popped patch from future:', patch.kind, patch.data)
+
+    patches.push(patch)
+    history.past.push(patch)
+
+    // Skip caret movements
+    if (patch.kind === 'caret') continue
+
+    // Check if we should continue grouping
+    const nextPatch = history.future.peek()
+    if (!nextPatch) break
+
+    if (
+      patch.kind !== nextPatch.kind &&
+      !(isInsertEventType(patch.kind) && isInsertEventType(nextPatch.kind))
+    ) {
+      DEBUG && console.info('defaultRedo - group patches: ', patch, nextPatch)
+      break
+    }
+  }
+
+  DEBUG &&
+    console.log(
+      'defaultRedo - ✅ defaultRedo returning patches:',
+      patches.length,
+      'past length now:',
+      history.past.array.length,
+    )
+
+  return patches
+}
+
+function dispatchRedoEvent(event: DOMEvent<KeyboardEvent>) {
+  event.preventDefault()
+  event.currentTarget.dispatchEvent(
+    new InputEvent('beforeinput', {
+      inputType: 'historyRedo',
+      bubbles: true,
+      cancelable: true,
+    }),
+  )
+}
+
+function dispatchUndoEvent(event: DOMEvent<KeyboardEvent>) {
+  event.preventDefault()
+  event.currentTarget.dispatchEvent(
+    new InputEvent('beforeinput', {
+      inputType: 'historyUndo',
+      bubbles: true,
+      cancelable: true,
+    }),
+  )
+}
+
+/**********************************************************************************/
+/*                                                                                */
+/*                                Content Editable                                */
+/*                                                                                */
+/**********************************************************************************/
+
+export type Keybinding<TPatchKind> = Record<
+  string,
+  (data: {
+    textContent: string
+    range: RangeOffsets
+    event: KeyboardEvent & { currentTarget: HTMLElement }
+  }) => Patch<TPatchKind> | null
+>
+
+export type ContentEditableProps<
+  TComponent extends keyof JSX.IntrinsicElements,
+  TPatchKind extends string | never = never,
+> = Omit<
+  ComponentProps<TComponent>,
+  | 'children'
+  | 'contenteditable'
+  | 'textContent'
+  | 'onInput'
+  | 'style'
+  | 'onBeforeInput'
+  | 'onCompositionEnd'
+> & {
+  as?: TComponent
+  /**
+   * Add additional key-bindings.
+   * @warning
+   * The given key-bindings are normalized according to the following order:
+   * `CTRL - ALT - SHIFT - META - [key]`
+   *
+   * [see](https://superuser.com/a/1238062)
+   */
+  keyBindings?: Keybinding<TPatchKind>
+  /** If contentEditable is editable or not. Defaults to `true`. */
+  editable?: boolean
+  /**
+   * Callback to handle undo operations.
+   * If not provided, uses the default undo behavior.
+   *
+   * @param history - The history object with past and future stacks
+   * @returns Array of patches that should be undone (applied in reverse)
+   */
+  onUndo?: HistoryHandler<TPatchKind>
+  /**
+   * Callback to handle redo operations.
+   * If not provided, uses the default redo behavior.
+   *
+   * @param history - The history object with past and future stacks
+   * @returns Array of patches that should be redone (applied forward)
+   */
+  onRedo?: HistoryHandler<TPatchKind>
+  onBeforeInput?(event: DOMEvent<InputEvent, HTMLDivElement>): void
+  onCompositionEnd?(event: DOMEvent<CompositionEvent, HTMLDivElement>): void
+  /** Event-callback called whenever `content` is updated */
+  onTextContent?: (value: string) => void
+  /**
+   * Render-prop receiving `textContent`, enabling the addition of visual markup to the `<ContentEditable/>` content.
+   *
+   * @warning
+   * - The content returned by this prop must maintain the original `textContent` as provided, ensuring that any added visual elements do not alter the functional text.
+   * - Deviating from the original `textContent` can lead to **undefined behavior**.
+   *
+   * [see README](https://www.github.com/bigmistqke/solid-contenteditable/#limitations-with-render-prop).
+   */
+  render?(textContent: Accessor<string>): JSX.Element
+  /** If `<ContentEditable/>` accepts only singleline input.  Defaults to `false`. */
+  singleline?: boolean
+  style?: JSX.CSSProperties
+  /** The `textContent` of `<ContentEditable/>`. */
+  textContent: string
+}
+
+export function ContentEditable<
+  TComponent extends keyof JSX.IntrinsicElements = 'div',
+  TPatchKind extends string = never,
+>(props: ContentEditableProps<TComponent, TPatchKind>) {
+  const [config, rest] = splitProps(
+    mergeProps(
+      {
+        spellcheck: false,
+        editable: true,
+        singleline: false,
+        onRedo: defaultRedo as HistoryHandler<TPatchKind>,
+        onUndo: defaultUndo as HistoryHandler<TPatchKind>,
+      },
+      props,
+    ),
+    [
+      'as',
+      'editable',
+      'keyBindings',
+      'onBeforeInput',
+      'onBeforeInput',
+      'onCompositionEnd',
+      'onRedo',
+      'onTextContent',
+      'onUndo',
+      'render',
+      'singleline',
+      'style',
+      'textContent',
+      'onCompositionEnd',
+      // @ts-expect-error
+      'ref',
+    ],
+  )
+  const [textContent, setTextContent] = createWritable(() => props.textContent)
+  const history = createHistory<TPatchKind>()
+  let element: HTMLElement = null!
+
+  // Add an additional newline if the value ends with a newline,
+  // otherwise the browser will not display the trailing newline.
+  const textContentWithTrailingNewLine = createMemo(() =>
+    textContent().endsWith('\n') ? `${textContent()}\n` : textContent(),
+  )
+  const c = children(
+    () => props.render?.(textContentWithTrailingNewLine) || textContentWithTrailingNewLine(),
+  )
+  const normalizedKeyBindings = createMemo(() =>
+    Object.fromEntries(
+      Object.entries(config.keyBindings || {}).map(([key, value]) => {
+        return [normalizeKeyCombo(key), value]
+      }),
+    ),
+  )
+
+  function applyPatch(patch: Patch<TPatchKind>) {
+    history.past.push(patch)
+
+    const oldValue = textContent()
+    const newValue = `${oldValue.slice(0, patch.range.start)}${patch.data ?? ''}${oldValue.slice(
+      patch.range.end,
+    )}`
+
+    DEBUG &&
+      console.info(
+        'applyPatch - 🔧 Applying patch',
+        JSON.stringify({
+          patch,
+          oldValue,
+          newValue,
+          range: patch.range,
+          replacedText: `"${oldValue.slice(patch.range.start, patch.range.end)}"`,
+          insertedData: `"${patch.data}"`,
+        }),
+      )
+
+    setTextContent(newValue)
+    props.onTextContent?.(newValue)
+  }
+
+  function onBeforeInput(event: DOMEvent<InputEvent, HTMLDivElement>) {
+    config.onBeforeInput?.(event)
+
+    if (event.defaultPrevented) {
+      return
+    }
+
+    event.preventDefault()
+
+    DEBUG && console.info('onBeforeInput - 📝 Processing input event', event)
+
+    if (event.isComposing) {
+      return
+    }
+
+    if (isSingleLineEventType(event.inputType) && config.singleline) {
+      return
+    }
+
+    switch (event.inputType) {
+      case 'historyUndo': {
+        // Get patches to undo using custom handler or default
+        const patches = config.onUndo(history)
+
+        // Apply undo for each patch
+        let lastSelection: SelectionOffsets | undefined
+
+        for (const patch of patches) {
+          if (patch.kind === 'caret') {
+            lastSelection = patch.selection
+            continue
+          }
+
+          setTextContent(
+            value =>
+              `${value.slice(0, patch.range.start)}${patch.undo}${value.slice(
+                patch.range.start + (patch.data?.length ?? 0),
+              )}`,
+          )
+
+          lastSelection = patch.selection
+        }
+
+        // Restore selection from last non-caret patch
+        if (lastSelection) {
+          select(element, lastSelection)
+        }
+
+        props.onTextContent?.(textContent())
+        break
+      }
+      case 'historyRedo': {
+        // Get patches to redo using custom handler or default
+        const patches = config.onRedo(history)
+
+        // Apply redo for each patch
+        for (const patch of patches) {
+          if (patch.kind === 'caret') continue
+
+          applyPatch(patch)
+
+          select(element, { anchor: patch.range.start + (patch.data?.length ?? 0) })
+        }
+
+        props.onTextContent?.(textContent())
+        break
+      }
+      default: {
+        const [targetRange] = event.getTargetRanges()
+
+        if (!targetRange) {
+          throw new Error(`No target range available for ${event.inputType}`)
+        }
+
+        history.future.clear()
+
+        const data = getDataFromBeforeInputEvent(event, config.singleline)
+
+        const range = {
+          start: getTextOffset(
+            event.currentTarget,
+            targetRange.startContainer,
+            targetRange.startOffset,
+          ),
+          end: getTextOffset(event.currentTarget, targetRange.endContainer, targetRange.endOffset),
+        }
+
+        applyPatch({
+          kind: event.inputType as TPatchKind,
+          data,
+          range,
+          selection: getSelectionOffsets(event.currentTarget),
+          undo: textContent().slice(range.start, range.end),
+        })
+
+        select(element, { anchor: range.start + (data?.length ?? 0) })
+
+        break
+      }
+    }
+  }
+
+  function onKeyDown(event: DOMEvent<KeyboardEvent>) {
+    DEBUG && console.info('onKeyDown - ⌨️ Key pressed', event)
+
+    if (config.keyBindings) {
+      const keyCombo = getKeyComboFromKeyboardEvent(event)
+      const keybindings = normalizedKeyBindings()
+
+      if (keyCombo && keyCombo in keybindings) {
+        const createPatch = keybindings[keyCombo]!
+
+        // @ts-expect-error
+        const patch = createPatch({
+          textContent: textContent(),
+          range: getSelectionOffsets(event.currentTarget),
+          event,
+        })
+
+        if (patch) {
+          event.preventDefault()
+          history.future.clear()
+          applyPatch(patch)
+          select(element, { anchor: patch.range.start + (patch.data?.length ?? 0) })
+          return
+        }
+      }
+    }
+
+    // Update caret instead of creating a new caret history entry
+    if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
+      if (history.past.peek()?.kind !== 'caret') {
+        const selection = getSelectionOffsets(element)
+        history.past.push({
+          kind: 'caret',
+          range: selection,
+          selection,
+          undo: '',
+        })
+      }
+      return
+    }
+
+    if (IS_MAC) {
+      if (event.metaKey) {
+        switch (event.key) {
+          case 'z':
+            dispatchUndoEvent(event)
+            break
+          case 'Z':
+            dispatchRedoEvent(event)
+            break
+        }
+      }
+    } else {
+      if (event.ctrlKey) {
+        switch (event.key) {
+          case 'z':
+            dispatchUndoEvent(event)
+            break
+          case 'y':
+          case 'Z':
+            dispatchRedoEvent(event)
+            break
+        }
+      }
+    }
+  }
+
+  function onPointerDown() {
+    if (history.past.peek()?.kind === 'caret') return
+
+    const initialSelection = getSelectionOffsets(element)
+    const controller = new AbortController()
+
+    window.addEventListener(
+      'pointerup',
+      () => {
+        controller.abort()
+        const selection = getSelectionOffsets(element)
+
+        if (initialSelection.start === selection.start && initialSelection.end === selection.end) {
+          return
+        }
+
+        history.past.push({
+          kind: 'caret',
+          range: selection,
+          selection,
+          undo: '',
+        })
+      },
+      { signal: controller.signal },
+    )
+  }
+
+  function onCompositionEnd(event: DOMEvent<CompositionEvent, HTMLDivElement>) {
+    config.onCompositionEnd?.(event)
+
+    if (event.defaultPrevented) {
+      return
+    }
+
+    const elementText = event.currentTarget.textContent || ''
+
+    if (textContent() === elementText) {
+      return
+    }
+
+    const selection = getSelectionOffsets(event.currentTarget)
+
+    setTextContent(elementText)
+    props.onTextContent?.(elementText)
+
+    select(element, { anchor: selection.start, focus: selection.focus })
+  }
+
+  createEffect(
+    on(
+      () => [textContentWithTrailingNewLine(), c()] as const,
+      ([textContentWithTrailingNewLine]) => {
+        const textContent = element.textContent
+        if (textContent !== textContentWithTrailingNewLine) {
+          console.warn(
+            `⚠️ WARNING ⚠️
+- props.textContent and the container's textContent are not equal!
+- This breaks core-assumptions of <ContentEditable/> and will cause undefined behaviors!
+- see www.github.com/bigmistqke/solid-contenteditable/#limitations-with-render-prop`,
+          )
+          console.table({
+            'props.textContent': textContentWithTrailingNewLine,
+            'element.textContent': textContent,
+          })
+        }
+      },
+    ),
+  )
+
+  return (
+    /*  @ts-expect-error */
+    <Dynamic<TComponent>
+      component={(props.as ?? 'div') as TComponent}
+      /*  @ts-expect-error */
+      ref={mergeRefs(props.ref, _element => (element = _element))}
+      role="textbox"
+      tabIndex={0}
+      aria-multiline={!config.singleline}
+      contenteditable={config.editable}
+      onBeforeInput={onBeforeInput}
+      onKeyDown={onKeyDown}
+      onPointerDown={onPointerDown}
+      onCompositionEnd={onCompositionEnd}
+      style={{
+        'scrollbar-width': props.singleline ? 'none' : undefined,
+        'overflow-x': props.singleline ? 'auto' : undefined,
+        'white-space': props.singleline ? 'pre' : 'break-spaces',
+        ...config.style,
+      }}
+      {...rest}
+    >
+      {c()}
+    </Dynamic>
+  )
+}
