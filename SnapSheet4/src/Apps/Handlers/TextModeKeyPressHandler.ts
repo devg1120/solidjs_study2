@@ -95,9 +95,9 @@ export function textModeHandleKeyPress(event: KeyboardEvent, textMode: TextMode)
             //newFormula = newFormula.slice(0, start) + '関西' + newFormula.slice(end);
             moveCursor(start + 1);
         } else {
-            newFormula = newFormula.slice(0, cursorPosition) + event.key + newFormula.slice(cursorPosition);
+            //newFormula = newFormula.slice(0, cursorPosition) + event.key + newFormula.slice(cursorPosition);
             //newFormula = newFormula.slice(0, cursorPosition) + '関' + newFormula.slice(cursorPosition);
-            moveCursor(cursorPosition + 1);
+            //moveCursor(cursorPosition + 1);
         }
     } else {
         return; // Ignore other keys
