@@ -58,7 +58,7 @@ const CellRenderer: Component<CellRendererProps> = (props) => {
     };
 
     const update = (e) => {
-             console.log(e);
+             console.log("update", e);
 
     }
 
