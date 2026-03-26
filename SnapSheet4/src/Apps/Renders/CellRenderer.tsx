@@ -1,6 +1,6 @@
 import { Component } from "solid-js";
 import { Cell, TextMode } from "../StateManagement/Types";
-import { state } from "../StateManagement/Statemanager";
+import { state, setState } from "../StateManagement/Statemanager";
 import { handleMouseClick } from "../Handlers/MouseHandler";
 
 interface CellRendererProps {
@@ -10,6 +10,8 @@ interface CellRendererProps {
 }
 
 const CellRenderer: Component<CellRendererProps> = (props) => {
+    //console.log("cell", props.cell);
+
     const isSelected = () => state.selectedCells.some(
         (cellPosition) => cellPosition.row === props.row && cellPosition.column === props.col
     );
@@ -59,6 +61,9 @@ const CellRenderer: Component<CellRendererProps> = (props) => {
 
     const update = (e) => {
              console.log("update", e);
+	     let newFormula =  e
+             setState("cells", props.row, props.col, "formula", newFormula);
+
 
     }
 

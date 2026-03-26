@@ -10,6 +10,7 @@ interface CellRendererProps {
 }
 
 const CellRenderer: Component<CellRendererProps> = (props) => {
+
     const isSelected = () => state.selectedCells.some(
         (cellPosition) => cellPosition.row === props.row && cellPosition.column === props.col
     );
