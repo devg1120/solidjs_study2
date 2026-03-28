@@ -20,7 +20,8 @@ export function textModeHandleKeyPress(event: KeyboardEvent, textMode: TextMode)
     if (!selectedCell) return; // No cell selected
 
     const { row, column } = selectedCell;
-    const cell = state.cells[row][column]; 
+    //const cell = state.cells[row][column]; //GUSA
+    const cell = state.cells[row].data[column];
 
     let cursorPosition = textMode.cursorPosition;
     const cursorSelectionStartPosition = textMode.cursorSelectionStartPosition;

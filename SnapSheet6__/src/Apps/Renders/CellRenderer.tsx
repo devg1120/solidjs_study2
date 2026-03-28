@@ -17,7 +17,8 @@ const CellRenderer: Component<CellRendererProps> = (props) => {
     );
 
     const isReferenced = () => state.selectedCells.some(
-        (cellPosition) => state.cells[cellPosition.row][cellPosition.column].cachedFormulaReferencedCells.some(
+        //(cellPosition) => state.cells[cellPosition.row][cellPosition.column].cachedFormulaReferencedCells.some(
+        (cellPosition) => state.cells[cellPosition.row].data[cellPosition.column].cachedFormulaReferencedCells.some(
             (referencedCellPosition) => referencedCellPosition.row === props.row && referencedCellPosition.column === props.col
         )
     );

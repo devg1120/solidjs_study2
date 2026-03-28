@@ -1,5 +1,5 @@
 export interface Spreadsheet {
-    cells: Cell[][]; // First array is column, second is row
+    cells: [][]; // First array is column, second is row
     selectedCells: CellPosition[];
     mode: TextMode | MarkMode;
     viewPort: ViewPort;
@@ -15,9 +15,7 @@ export interface Cell {
     formula: string;
     cachedFormulaValue: string | number,
     cachedDependencies: CellPosition[],
-    cachedFormulaReferencedCells: CellPosition[],
-    width: number,
-    height: number
+    cachedFormulaReferencedCells: CellPosition[]
 }
 
 export interface CellPosition {

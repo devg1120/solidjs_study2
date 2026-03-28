@@ -52,14 +52,13 @@ const SpreadSheetRenderer: Component = () => {
 
     const columnHeaders = () => {
         const startCol = state.viewPort.viewPortTopLeftShownCell.column;
-        const endCol = Math.min(state.cells[0]?.length || 0, startCol + state.viewPort.columnInScreen);
-        //const endCol = Math.min(state.cells[0].data?.length || 0, startCol + state.viewPort.columnInScreen);
+        //const endCol = Math.min(state.cells[0]?.length || 0, startCol + state.viewPort.columnInScreen);
+        const endCol = Math.min(state.cells[0].data?.length || 0, startCol + state.viewPort.columnInScreen);
         return Array.from({ length: endCol - startCol }, (_, i) => {
             const str = String.fromCharCode("A".charCodeAt(0) + startCol + i)
             return {
               label: str,
-	      //width: 80*(i+1)*0.5,
-	      width: state.cells[0][i].width,
+	      width: 80*(i+1)*0.5,
 	      }
 	   }
         );
@@ -132,9 +131,9 @@ const SpreadSheetRenderer: Component = () => {
             <tbody>
                 <For each={state.cells.slice(state.viewPort.viewPortTopLeftShownCell.row, state.viewPort.viewPortTopLeftShownCell.row + state.viewPort.rowsInScreen)}>
                     {(row, rowIndex) => (
-                        <tr class="row_" id={"TR_" + rowIndex()} height={state.cells[rowIndex()][0].height}>
+                        <tr class="row_" id={"TR_" + rowIndex()} height={row.height}>
                             <td class="cellrow" id={"TH_" + rowIndex()}>{state.viewPort.viewPortTopLeftShownCell.row + rowIndex() + 1}</td> {/* Row header */}
-                            <For each={row.slice(state.viewPort.viewPortTopLeftShownCell.column, state.viewPort.viewPortTopLeftShownCell.column + state.viewPort.columnInScreen)}>
+                            <For each={row.data.slice(state.viewPort.viewPortTopLeftShownCell.column, state.viewPort.viewPortTopLeftShownCell.column + state.viewPort.columnInScreen)}>
                                 {(cell, colIndex) => (
                                     <td class="tdcell" id= {"TD_" + rowIndex() + "_" + colIndex()}>
                                         <CellRenderer

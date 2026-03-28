@@ -76,10 +76,10 @@ function EvaluateSelectedFormulas() {
 }
 
 export function UpdateCellFormulaNoEvaluate(row: number, col: number, formula: string): void {
-    if (state.cells[row] && state.cells[row][col]) {
+    if (state.cells[row].data && state.cells[row],data[col]) {
         setState("cells", row, col, { formula } as Cell);
     } else {
-        console.error("Invalid row or column index");
+        console.error("*** Invalid row or column index");
     }
 }
 
@@ -89,8 +89,8 @@ export function UpdateCellFormulaAndEvaluate(row: number, col: number, formula: 
 }
 
 function EvaluateCellFormula(row: number, col: number): void {
-    if (state.cells[row] && state.cells[row][col]) {
-        let formula = state.cells[row][col].formula;
+    if (state.cells[row] && state.cells[row].data[col]) {
+        let formula = state.cells[row].data[col].formula;
         let cachedFormulaValue: string | number;
         let cachedFormulaReferencedCells : CellPosition[] = [];
         if (formula.startsWith('=')) {
@@ -101,19 +101,19 @@ function EvaluateCellFormula(row: number, col: number): void {
         } else {
             cachedFormulaValue = formula; // Treat as plain text
         }
-        setState("cells", row, col, { cachedFormulaValue, cachedDependencies: state.cells[row][col].cachedDependencies, cachedFormulaReferencedCells } as Cell);
+        setState("cells", row, col, { cachedFormulaValue, cachedDependencies: state.cells[row].data[col].cachedDependencies, cachedFormulaReferencedCells } as Cell);
 
-        state.cells[row][col].cachedDependencies.forEach(dependency => {
+        state.cells[row].data[col].cachedDependencies.forEach(dependency => {
             EvaluateCellFormula(dependency.row, dependency.column);
         });
     } else {
-        console.error("Invalid row or column index");
+        console.error("222 Invalid row or column index");
     }
 }
 
 export function UpdateCellDependencies(row: number, col: number, dependencies: CellPosition[]): void {
     dependencies.forEach(dep => {
-        const dependentCell = state.cells[dep.row][dep.column];
+        const dependentCell = state.cells[dep.row].data[dep.column];
         
         if (!dependentCell.cachedDependencies) {
             dependentCell.cachedDependencies = [];
@@ -128,10 +128,7 @@ export function UpdateCellDependencies(row: number, col: number, dependencies: C
 }
 
 function createCell(initValue: string): Cell {
-    return { formula: initValue, cachedFormulaValue: initValue, cachedDependencies: [], cachedFormulaReferencedCells: [] ,
-	    width:100,
-	    height:22
-    };
+    return { formula: initValue, cachedFormulaValue: initValue, cachedDependencies: [], cachedFormulaReferencedCells: [] };
 }
 
 export function addColumn(): void { 
@@ -141,11 +138,11 @@ export function addColumn(): void {
 }
 
 export function addRow(): void {
-    const newRow = state.cells[0].map(() => createCell("")); // Create a new row with empty cells
+    const newRow = state.cells[0].data.map(() => createCell("")); // Create a new row with empty cells
     setState("cells", cells => [...cells, newRow]); // Append the new row to the cells
 }
 
-function getCells_(): Cell[][] {
+function getCells(): Cell[][] {
     let cells : Cell[][] = [];
     
     for (let rowIndex = 0; rowIndex < 100; rowIndex++) {
@@ -155,7 +152,7 @@ function getCells_(): Cell[][] {
         }
 	const row_dict = {
             data : row,
-	    height: 20,
+	    height: 26,
 	}
         cells.push(row_dict);
     }
@@ -163,7 +160,7 @@ function getCells_(): Cell[][] {
     return cells;
 }
 
-function getCells(): Cell[][] {
+function getCells_(): Cell[][] {
     let cells : Cell[][] = [];
     
     for (let rowIndex = 0; rowIndex < 100; rowIndex++) {
