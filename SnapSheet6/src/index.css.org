@@ -1,13 +1,6 @@
-/*@tailwind base;*/
-/*@tailwind components;*/
-/*@tailwind utilities;*/
-
-table {
-    border-collapse: collapse;
-    table-layout: fixed;
-
-}
-
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 body {
     overflow: hidden;
@@ -20,7 +13,7 @@ body {
 .absolute-cursor {
     width: 1px;
     height: 1em;
-    background-color: red; /* Cursor color */
+    background-color: black; /* Cursor color */
     position: absolute;
     top: 0;
     transform: translateY(0.2em); /* Adjust this value as needed */
@@ -34,7 +27,6 @@ body {
     50% {
         opacity: 0.5;
     }
-
     99% {
         opacity: 0;
     }
@@ -48,21 +40,15 @@ body {
     cursor: text;
 }
 
-.col_resize{position: absolute; top: 0; left: 0; width: 7px; height: 102%; background: transparent; cursor: col-resize;}
-
-.row_resize{position: absolute; top: 0; left: 0; width: 100%; height: 7px; background: transparent; cursor: row-resize;}
-
-
 .tdcell{
     padding: 0px;
     /* border: solid 1px  lightgray; */
     border: solid 1px  #e0e0e0;
-
 }
 
 .cell {
     font-size: 12px;
-    /*width: 100px;*/
+    width: 100px;
     height: 1.5em;
     overflow: hidden;
     white-space: pre;
@@ -103,8 +89,3 @@ body {
     background-color: gray;
 }
 
-.cell-selected-text {
-   border: solid 2px green;
-   /* background-color: yellow;*/
-
-}

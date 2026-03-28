@@ -142,7 +142,7 @@ export function addRow(): void {
     setState("cells", cells => [...cells, newRow]); // Append the new row to the cells
 }
 
-function getCells_(): Cell[][] {
+function getCells(): Cell[][] {
     let cells : Cell[][] = [];
     
     for (let rowIndex = 0; rowIndex < 100; rowIndex++) {
@@ -160,7 +160,7 @@ function getCells_(): Cell[][] {
     return cells;
 }
 
-function getCells(): Cell[][] {
+function getCells_(): Cell[][] {
     let cells : Cell[][] = [];
     
     for (let rowIndex = 0; rowIndex < 100; rowIndex++) {
