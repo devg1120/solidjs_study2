@@ -8,6 +8,9 @@ table {
 
 }
 
+textarea {
+  field-sizing: content;
+}
 
 body {
     overflow: hidden;

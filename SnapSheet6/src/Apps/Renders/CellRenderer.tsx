@@ -60,12 +60,13 @@ const CellRenderer: Component<CellRendererProps> = (props) => {
     };
 
     const update = (e) => {
-             console.log("update", e);
+             //console.log("update", e);
 	     let newFormula =  e
              setState("cells", props.row, props.col, "formula", newFormula);
 
 
     }
+    const font_size = 12;
 
     return (
         //<div onMouseDown={handleCellClick} class={`cell ${!isReferenced() && !isSelected() ? "w-24 h-24 border-0 border-solid border-gray-600 bg-gray-100" : ""} ${isReferenced() ? "w-24 h-24 border-2 border-dashed border-indigo-600 bg-indigo-100" : "" } ${isSelected() && !isTextMode() ? "w-24 h-24 border-2 border-none border-indigo-600 bg-indigo-100" : "" } ${isSelected() && isTextMode() ? "w-24 h-24 border border-solid border-indigo-600 bg-indigo-100" : "" }`} style="position: relative;">
@@ -105,8 +106,10 @@ const CellRenderer: Component<CellRendererProps> = (props) => {
                 )}
         </div>
 */
-
-
+/*
+        width={state.cells[0][props.col].width}
+        height={state.cells[props.row][0].height}
+*/
 
         <div onMouseDown={handleCellClick} 
 	     class={`cell 
@@ -115,18 +118,22 @@ const CellRenderer: Component<CellRendererProps> = (props) => {
 	             ${isSelected() && !isTextMode()    ? "cell-selected-text"   : "" } 
 	             ${isSelected() && isTextMode()     ? "cell-selected-text"    : "" }
 	             `} 
-	     style="position: relative;"
+                  style={{
+                    "font-size": `${font_size}px`,
+                    "height": `${state.cells[props.row][0].height/font_size}em`}}
+
 	     >
             {isSelected() && isTextMode() ? (
 
       <textarea
         value={props.cell.cachedFormulaValue}
         onInput={(e) => update(e.currentTarget.value)}
-
+	style="width:100%; overflow: hidden; "
       />
             ) : 
                 (
-                    <div class="cell-content">{props.cell.cachedFormulaValue}</div>
+                    <div class="cell-content"
+		    >{props.cell.cachedFormulaValue}</div>
                 )}
         </div>
 

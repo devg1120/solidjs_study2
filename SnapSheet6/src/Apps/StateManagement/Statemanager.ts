@@ -130,7 +130,7 @@ export function UpdateCellDependencies(row: number, col: number, dependencies: C
 function createCell(initValue: string): Cell {
     return { formula: initValue, cachedFormulaValue: initValue, cachedDependencies: [], cachedFormulaReferencedCells: [] ,
 	    width:100,
-	    height:22
+	    height:25
     };
 }
 
@@ -159,6 +159,10 @@ function getCells_(): Cell[][] {
 	}
         cells.push(row_dict);
     }
+    
+    //setState("cells", 0, 3, "width", 160);
+    //setState("cells", 5, 0, "height", 60);
+
 
     return cells;
 }
@@ -173,6 +177,5 @@ function getCells(): Cell[][] {
         }
         cells.push(row);
     }
-
     return cells;
 }
