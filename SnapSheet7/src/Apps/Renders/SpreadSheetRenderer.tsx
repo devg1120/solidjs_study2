@@ -3,6 +3,8 @@ import { state, setState } from "../StateManagement/Statemanager";
 import CellRenderer from "./CellRenderer";
 import { getViewportSize } from "./ViewPort";
 
+import { handleMouseWheel } from "../Handlers/MouseWheelHandler";
+
 //import "./table.css";
 
 const SpreadSheetRenderer: Component = () => {
@@ -17,6 +19,9 @@ const SpreadSheetRenderer: Component = () => {
     }
 
     let table;
+
+    //table.addEventListener("wheel", handleMouseWheel);
+
     let table_th;
 
     let th_width;
@@ -44,6 +49,7 @@ const SpreadSheetRenderer: Component = () => {
 	setValue();
         createResizeColDiv();
         createResizeRowDiv();
+        table.addEventListener("wheel", handleMouseWheel);
     });
 
 
@@ -93,7 +99,7 @@ const SpreadSheetRenderer: Component = () => {
     });
     let th_length = table_th.length;
     const cr_width = 27; //cellrow wisth
-    console.log("th_length", th_length);
+    //console.log("th_length", th_length);
     for (let i = 1; i <= th_length; i++) {
       let yDiv = document.createElement("div");
       yDiv.className = "col_resize tb_resize";
@@ -106,6 +112,7 @@ const SpreadSheetRenderer: Component = () => {
 
 
  const  createResizeRowDiv = () => {
+    //let startRow = state.viewPort.viewPortTopLeftShownCell.row;
     const resizes = container.querySelectorAll(".row_resize");
     resizes.forEach((ele) => {
       ele.remove();
@@ -116,9 +123,9 @@ const SpreadSheetRenderer: Component = () => {
     //table.childNodes.forEach((c) => {
     const tbody = table.querySelector("tbody");
     tbody.childNodes.forEach((c) => {
-      console.log(c.nodeName );
+      //console.log(c.nodeName );
       if (c.nodeName == "TR") {
-        console.log("TR")
+        //console.log("TR")
         var xDiv = document.createElement("div");
         xDiv.className = "row_resize tb_resize";
         xDiv.setAttribute("data-resizerow", i);

@@ -10,6 +10,7 @@ export function handleKeyPress(event: KeyboardEvent) {
         textModeHandleKeyPress(event, textMode);
     }
     else if('markMode' in state.mode) {
+        //console.log("markMode Keydown", event);
         let markMode = (state.mode as MarkMode);
         markModeHandleKeyPress(event, markMode)
     }
