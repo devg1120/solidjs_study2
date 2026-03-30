@@ -8,6 +8,9 @@ import { handleMouseWheel } from "../Handlers/MouseWheelHandler";
 //import "./table.css";
 
 const SpreadSheetRenderer: Component = () => {
+
+const [isOnline, setIsOnline] = createSignal(false);
+
     const updateViewportSize = () => {
         const viewSize = getViewportSize();
 	
@@ -47,9 +50,10 @@ const SpreadSheetRenderer: Component = () => {
 	//console.log(col_resizes);
 	//console.log(row_resizes);
 	setValue();
-        createResizeColDiv();
-        createResizeRowDiv();
+        //createResizeColDiv();
+        //createResizeRowDiv("onMount");
         table.addEventListener("wheel", handleMouseWheel);
+       //setIsOnline(true); 
     });
 
 
@@ -86,19 +90,39 @@ const SpreadSheetRenderer: Component = () => {
 
     onCleanup(() => {
 	    console.log("onCleanup");
+            //createResizeRowDiv("onCleanup");
 
     });
 
     let container;
 
 
- const createResizeColDiv = () => {
+createEffect(() => {
+  let start_row = state.viewPort.viewPortTopLeftShownCell.row;
+ createResizeRowDiv("effect viewPort row");
+
+})
+
+createEffect(() => {
+  let start_col =  state.viewPort.viewPortTopLeftShownCell.column;
+ createResizeColDiv("effect viewPort col");
+
+})
+createEffect(() => {
+let on =  isOnline()
+ createResizeRowDiv("effect online");
+
+
+})
+
+
+ const createResizeColDiv__ = () => {
     const resizes = container.querySelectorAll(".col_resize");
     resizes.forEach((ele) => {
       ele.remove();
     });
     let th_length = table_th.length;
-    const cr_width = 27; //cellrow wisth
+    const cr_width = 57; //cellrow wisth
     //console.log("th_length", th_length);
     for (let i = 1; i <= th_length; i++) {
       let yDiv = document.createElement("div");
@@ -110,8 +134,46 @@ const SpreadSheetRenderer: Component = () => {
     }
   }
 
+ const createResizeColDiv = () => {
+    const resizes = container.querySelectorAll(".col_resize");
+    resizes.forEach((ele) => {
+      ele.remove();
+    });
+    let th_length = table_th.length;
+    //const cr_width = 57; //cellrow wisth
+    //console.log("th_length", th_length);
+    let i = 0;
+    const thead = table.querySelector("thead");
+    const th = thead.childNodes[0];
+    th.childNodes.forEach((c) => {
+      if (c.nodeName == "TH") {
+	i++;
+        if ( i == 1) { return; }
+        console.log(c)
+        let yDiv = document.createElement("div");
+        yDiv.className = "col_resize tb_resize";
+        yDiv.setAttribute("data-resizecol", i);
+        //let leftPos = i * th_width + 0.5 ;
+        var leftPos = c.offsetLeft + c.offsetWidth  -4;
+        yDiv.style.cssText = "left: " +  leftPos + "px;";
+        container.append(yDiv);
+      }
+    })
+    /*
+    for (let i = 1; i <= th_length; i++) {
+      let yDiv = document.createElement("div");
+      yDiv.className = "col_resize tb_resize";
+      yDiv.setAttribute("data-resizecol", i);
+      //let leftPos = i * th_width + 0.5 ;
+      var leftPos = c.offsetLeft + c.offsetWidth  -4;
+      yDiv.style.cssText = "left: " +  leftPos + "px;";
+      container.append(yDiv);
+    }
+   */
+  }
 
- const  createResizeRowDiv = () => {
+ const  createResizeRowDiv = (cose) => {
+     console.log("createResizeRowDiv", cose)
     //let startRow = state.viewPort.viewPortTopLeftShownCell.row;
     const resizes = container.querySelectorAll(".row_resize");
     resizes.forEach((ele) => {

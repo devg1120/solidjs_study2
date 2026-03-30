@@ -16,8 +16,6 @@ const App: Component = () => {
     return (
         <>  
             <SpreadSheetRenderer />
-            <SpreadSheetRenderer />
-            <SpreadSheetRenderer />
         </>
     );
 };
