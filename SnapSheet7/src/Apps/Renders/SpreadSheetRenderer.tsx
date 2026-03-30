@@ -142,13 +142,13 @@ let on =  isOnline()
     let th_length = table_th.length;
     //const cr_width = 57; //cellrow wisth
     //console.log("th_length", th_length);
-    let i = 0;
+    let i = -1;
     const thead = table.querySelector("thead");
     const th = thead.childNodes[0];
     th.childNodes.forEach((c) => {
       if (c.nodeName == "TH") {
 	i++;
-        if ( i == 1) { return; }
+        if ( i == 0) { return; }
         console.log(c)
         let yDiv = document.createElement("div");
         yDiv.className = "col_resize tb_resize";
@@ -181,12 +181,13 @@ let on =  isOnline()
     });
     //var th_length = this.table_th.length;
     //for (var i = 1; i <= th_length; i++) {
-    let i = 1;
+    let i = 0;
     //table.childNodes.forEach((c) => {
     const tbody = table.querySelector("tbody");
     tbody.childNodes.forEach((c) => {
       //console.log(c.nodeName );
       if (c.nodeName == "TR") {
+	i++;
         //console.log("TR")
         var xDiv = document.createElement("div");
         xDiv.className = "row_resize tb_resize";
@@ -195,7 +196,6 @@ let on =  isOnline()
         var topPos = c.offsetTop + c.offsetHeight  -4;
         xDiv.style.cssText = "top: " + topPos + "px;";
         container.append(xDiv);
-        i += 1;
       }
     })
   }
